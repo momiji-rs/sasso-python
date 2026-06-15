@@ -1,0 +1,28 @@
+# Rust build output for the vendored native cdylib.
+native/target/
+target/
+
+# The bundled native library is built per-target in CI (and locally by
+# scripts/build_native.py) and copied in next to the package — never committed.
+src/sasso/libsasso.so
+src/sasso/libsasso.dylib
+src/sasso/sasso.dll
+
+# Python build / packaging artifacts.
+__pycache__/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+.eggs/
+wheelhouse/
+*.whl
+
+# Virtual environments.
+.venv/
+venv/
+
+# Test / tooling caches.
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

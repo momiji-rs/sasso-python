@@ -1,0 +1,78 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sasso"
+dynamic = ["version"]
+description = "Pure-Rust SCSS → CSS compiler for Python (ctypes bindings over the libsasso C ABI)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT OR Apache-2.0" }
+license-files = ["LICENSE-MIT", "LICENSE-APACHE"]
+authors = [{ name = "momiji-rs" }]
+keywords = ["sass", "scss", "css", "compiler", "rust"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Compilers",
+  "Topic :: Software Development :: Libraries",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/momiji-rs/sasso"
+Repository = "https://github.com/momiji-rs/sasso-python"
+Issues = "https://github.com/momiji-rs/sasso-python/issues"
+
+# Single source of truth for the version: sasso.__version__ in src/sasso/__init__.py.
+[tool.hatch.version]
+path = "src/sasso/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sasso"]
+# hatchling builds a py3-none-any wheel that bundles the native library; the
+# platform tag and the Root-Is-Purelib=false (platlib) flag for this not-actually
+# -pure wheel are applied afterwards by scripts/retag_wheel.py (used both locally
+# and in release.yml), since a single native lib per (OS, arch) serves all
+# CPython 3.x.
+# The native lib (built into src/sasso/ by scripts/build_native.py before the
+# wheel build) is package data — include every platform's filename so this same
+# config produces a correct wheel on any (OS, arch) runner; only the one built
+# for the host will actually be present.
+artifacts = [
+  "src/sasso/libsasso.so",
+  "src/sasso/libsasso.dylib",
+  "src/sasso/sasso.dll",
+  "src/sasso/py.typed",
+]
+
+# The sdist must NOT carry a prebuilt native library (the lib is built per-target
+# in CI). Ship the package sources + the vendored native/ crate so the sdist is
+# buildable-from-source, but force-exclude any stray built lib.
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/sasso",
+  "native",
+  "scripts",
+  "tests",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE-MIT",
+  "LICENSE-APACHE",
+]
+exclude = [
+  "src/sasso/libsasso.so",
+  "src/sasso/libsasso.dylib",
+  "src/sasso/sasso.dll",
+  "native/target",
+  "**/__pycache__",
+]

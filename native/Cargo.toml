@@ -1,0 +1,53 @@
+# The native cdylib for the `sasso` Python package: a C-ABI (FFI) wrapper around
+# the PUBLISHED `sasso` core compiler crate. This crate is VENDORED from the
+# `momiji-rs/sasso` repository's `ffi/` directory (src/lib.rs, include/sasso.h,
+# cbindgen.toml are verbatim copies — keep them in sync with upstream).
+#
+# It is NOT published to crates.io (`publish = false`); it exists only to produce
+# `libsasso.{so,dylib,dll}`, which the Python package bundles as package data and
+# loads via `ctypes`. Crucially, it depends on the core crate via an EXACT version
+# pin from crates.io (NOT a path dependency) — this proves the
+# separate-repo-builds-against-the-published-crate model and is what every
+# downstream consumer of the published `sasso` crate experiences.
+#
+# Self-contained workspace root: the empty `[workspace]` stops cargo's upward
+# manifest walk here, so the crate resolves identically wherever it is checked out.
+[workspace]
+
+[package]
+name = "sasso-native"
+# Tracks the bundled core `sasso` compiler version (reported by `sasso_version`).
+# The Python PACKAGE version floats independently — see pyproject.toml / CHANGELOG.
+version = "0.6.0"
+edition = "2021"
+# 1.77 for `std::mem::offset_of!` (per-field versioned-struct gating in
+# read_options), matching the upstream ffi crate.
+rust-version = "1.77"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "C ABI (FFI) cdylib bundled by the sasso Python package."
+
+[lib]
+# Output artifact is `libsasso.{so,dylib}` / `sasso.dll` — the conventional name a
+# C consumer (here, Python ctypes) loads. The core crate is pulled in under the
+# alias `sasso_core` (below) so this crate's own lib name `sasso` doesn't clash.
+name = "sasso"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The PUBLISHED core compiler, pinned exactly to the ABI surface this vendored
+# wrapper targets. NO path dependency: it resolves from crates.io. Renamed to
+# `sasso_core` so this package's lib can be named `sasso` (a crate may not depend
+# on a crate of its own name without a rename). Bump this pin deliberately to
+# adopt a new core release (and re-vendor src/lib.rs + include/sasso.h to match).
+sasso_core = { package = "sasso", version = "=0.6.0" }
+
+[profile.release]
+# Copied from the upstream ffi crate. `panic = "unwind"` is set EXPLICITLY (not
+# left to the default): the ABI's safety relies on `catch_unwind` to stop a Rust
+# panic from crossing the C boundary (which would be UB), and that only works
+# under the unwind strategy — `abort` would make `catch_unwind` a no-op.
+panic = "unwind"
+lto = "thin"
+codegen-units = 1
+strip = true

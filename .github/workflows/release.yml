@@ -1,0 +1,262 @@
+name: Release (PyPI)
+
+# Builds ONE self-contained platform wheel per (OS, arch) — this is a ctypes
+# binding, NOT a CPython C-extension, so a single native libsasso serves every
+# CPython 3.x on that target (tagged py3-none-<platform>, no per-Python matrix).
+# Each job builds the vendored native cdylib, builds a wheel, repairs it
+# (auditwheel/delocate/delvewheel), retags it, and uploads an artifact. A final
+# publish job pushes every wheel + the sdist to PyPI via Trusted Publishing
+# (OIDC — no API token).
+#
+# ONE-TIME setup on pypi.org BEFORE the first tag (the project doesn't exist yet,
+# so register a *pending* publisher under Account → Publishing):
+#   PyPI project name: sasso
+#   Owner:             momiji-rs
+#   Repository:        sasso-python
+#   Workflow filename: release.yml
+#   Environment name:  release
+# Also add a "release" environment in the repo (Settings → Environments).
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions: {}
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Linux (x86_64 + aarch64, manylinux + musllinux) — built INSIDE the official
+  # PyPA manylinux/musllinux containers so the glibc/musl baseline is correct and
+  # auditwheel can vendor/verify against it. aarch64 is cross-built by running the
+  # aarch64 container under QEMU binfmt emulation (simple, no cross-linker setup).
+  # -------------------------------------------------------------------------
+  linux:
+    name: linux ${{ matrix.arch }} · ${{ matrix.libc }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            libc: manylinux
+            image: quay.io/pypa/manylinux_2_17_x86_64
+            linux_tag: linux_x86_64
+            plat: manylinux_2_17_x86_64
+            qemu: false
+          - arch: x86_64
+            libc: musllinux
+            image: quay.io/pypa/musllinux_1_2_x86_64
+            linux_tag: linux_x86_64
+            plat: musllinux_1_2_x86_64
+            qemu: false
+          - arch: aarch64
+            libc: manylinux
+            image: quay.io/pypa/manylinux_2_17_aarch64
+            linux_tag: linux_aarch64
+            plat: manylinux_2_17_aarch64
+            qemu: true
+          - arch: aarch64
+            libc: musllinux
+            image: quay.io/pypa/musllinux_1_2_aarch64
+            linux_tag: linux_aarch64
+            plat: musllinux_1_2_aarch64
+            qemu: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # aarch64 wheels are cross-built by running the aarch64 PyPA container under
+      # QEMU binfmt emulation — the simplest correct option (no cross-linker
+      # setup; the lib is genuinely compiled for aarch64 inside the container, and
+      # auditwheel verifies the glibc/musl baseline against that container).
+      - name: Set up QEMU (aarch64 emulation)
+        if: ${{ matrix.qemu }}
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build, retag & repair wheel inside ${{ matrix.image }}
+        run: |
+          docker run --rm \
+            ${{ matrix.qemu && '--platform linux/arm64' || '' }} \
+            -v "$PWD":/io -w /io \
+            -e LINUX_TAG=${{ matrix.linux_tag }} \
+            -e PLAT=${{ matrix.plat }} \
+            ${{ matrix.image }} \
+            bash -euxo pipefail -c '
+              # Rust toolchain (manylinux/musllinux images have no rustup).
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              source "$HOME/.cargo/env"
+
+              # A modern CPython from the PyPA image to drive the build.
+              PYBIN=$(ls -d /opt/python/cp312-cp312/bin 2>/dev/null || ls -d /opt/python/cp311-cp311/bin)
+              export PATH="$PYBIN:$PATH"
+
+              python -m pip install --upgrade pip build auditwheel
+
+              # 1) native cdylib -> src/sasso/, then a py3-none-any wheel.
+              python scripts/build_native.py
+              python -m build --wheel --outdir /tmp/raw
+
+              # 2) Retag the pure-any wheel to a generic linux platform tag and
+              #    flip it to platlib, so auditwheel accepts it as a platform
+              #    wheel (it rejects none-any/purelib wheels).
+              python scripts/retag_wheel.py --platform-tag "$LINUX_TAG" \
+                --in-dir /tmp/raw --out-dir /tmp/tagged
+
+              # 3) auditwheel repair: vendor external libs + stamp the verified
+              #    manylinux/musllinux compressed tag. (Our lib only needs libc/
+              #    libm/libpthread, so this is mostly a baseline check + retag.)
+              mkdir -p wheelhouse
+              auditwheel repair --plat "$PLAT" -w wheelhouse /tmp/tagged/*.whl
+            '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.libc }}-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------
+  # macOS — arm64 (macos-14) and x86_64 (macos-13). Native build + delocate.
+  # -------------------------------------------------------------------------
+  macos:
+    name: macos ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+            platform_tag: macosx_11_0_arm64
+            macosx_deployment_target: "11.0"
+          - runner: macos-13
+            arch: x86_64
+            platform_tag: macosx_10_12_x86_64
+            macosx_deployment_target: "10.12"
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx_deployment_target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build delocate
+
+      - name: Build native cdylib + wheel
+        run: |
+          python scripts/build_native.py
+          python -m build --wheel --outdir dist
+
+      - name: Repair (delocate) + retag
+        run: |
+          mkdir -p repaired wheelhouse
+          delocate-wheel -w repaired dist/*.whl
+          python scripts/retag_wheel.py --platform-tag ${{ matrix.platform_tag }} \
+            --in-dir repaired --out-dir wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-macos-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------
+  # Windows x86_64. Native build + delvewheel.
+  # -------------------------------------------------------------------------
+  windows:
+    name: windows x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build delvewheel
+
+      - name: Build native cdylib + wheel
+        run: |
+          python scripts/build_native.py
+          python -m build --wheel --outdir dist
+
+      - name: Repair (delvewheel) + retag
+        shell: bash
+        run: |
+          mkdir -p repaired wheelhouse
+          delvewheel repair -w repaired dist/*.whl
+          python scripts/retag_wheel.py --platform-tag win_amd64 \
+            --in-dir repaired --out-dir wheelhouse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-windows-x86_64
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------
+  # Source distribution (built once; no prebuilt lib inside — buildable from
+  # the vendored native/ crate).
+  # -------------------------------------------------------------------------
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify package version == tag
+        run: |
+          v=$(python -c "import re,pathlib; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', pathlib.Path('src/sasso/__init__.py').read_text()).group(1))")
+          if [ "v${v}" != "${GITHUB_REF_NAME}" ]; then
+            echo "sasso.__version__ (${v}) != tag (${GITHUB_REF_NAME})"; exit 1
+          fi
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build --sdist --outdir dist
+      - name: Assert sdist carries no prebuilt library
+        run: |
+          if tar tzf dist/*.tar.gz | grep -E 'libsasso\.(so|dylib)|sasso\.dll'; then
+            echo "ERROR: sdist contains a prebuilt native library"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------
+  # Publish every artifact to PyPI via Trusted Publishing (OIDC) — no API token.
+  # -------------------------------------------------------------------------
+  publish:
+    name: publish to PyPI (OIDC)
+    needs: [linux, macos, windows, sdist]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write   # mint a short-lived PyPI token via OIDC (no secret)
+    steps:
+      - name: Download all wheels + sdist
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "{wheel-*,sdist}"
+          merge-multiple: true
+
+      - name: List artifacts to publish
+        run: ls -la dist
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
