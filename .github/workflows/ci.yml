@@ -21,8 +21,15 @@ jobs:
         # wrapper + the bundled lib load and run everywhere.
         python: ["3.8", "3.12"]
         exclude:
-          # 3.8 is unavailable on the arm64 macos-latest runner image.
+          # Python 3.8 (EOL) is no longer provided by the current macos-latest
+          # (arm64) or windows-latest runner images — actions/setup-python can't
+          # install it there. The 3.8 floor is still validated on ubuntu, and the
+          # shipped wheels are `py3-none-<platform>` so they run on any CPython
+          # 3.x (incl. 3.8) on those OSes regardless — it's only the CI runner
+          # that lacks a 3.8 interpreter to test with.
           - os: macos-latest
+            python: "3.8"
+          - os: windows-latest
             python: "3.8"
     steps:
       - uses: actions/checkout@v4
