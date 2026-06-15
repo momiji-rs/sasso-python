@@ -92,7 +92,7 @@ jobs:
               PYBIN=$(ls -d /opt/python/cp312-cp312/bin 2>/dev/null || ls -d /opt/python/cp311-cp311/bin)
               export PATH="$PYBIN:$PATH"
 
-              python -m pip install --upgrade pip build auditwheel
+              python -m pip install --upgrade pip build wheel auditwheel
 
               # 1) native cdylib -> src/sasso/, then a py3-none-any wheel.
               python scripts/build_native.py
@@ -147,7 +147,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install build tooling
-        run: python -m pip install --upgrade pip build delocate
+        run: python -m pip install --upgrade pip build wheel delocate
 
       - name: Build native cdylib + wheel
         run: |
@@ -183,7 +183,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install build tooling
-        run: python -m pip install --upgrade pip build delvewheel
+        run: python -m pip install --upgrade pip build wheel delvewheel
 
       - name: Build native cdylib + wheel
         run: |
