@@ -236,6 +236,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify package version == tag
+        # Only meaningful on a tag push; a workflow_dispatch dry run has no tag.
+        if: github.event_name == 'push'
         run: |
           v=$(python -c "import re,pathlib; print(re.search(r'__version__\s*=\s*\"([^\"]+)\"', pathlib.Path('src/sasso/__init__.py').read_text()).group(1))")
           if [ "v${v}" != "${GITHUB_REF_NAME}" ]; then
