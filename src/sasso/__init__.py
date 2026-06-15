@@ -31,7 +31,7 @@ __all__ = [
 #: Version of this Python package (PEP 396). Floats independently of the bundled
 #: ``sasso`` compiler crate, whose version is :func:`compiler_version`. This is
 #: the single source of truth: ``pyproject.toml`` reads it dynamically.
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 def compiler_version() -> str:

@@ -8,6 +8,10 @@ release notes the exact core crate version it bundles.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-15
+
+Bundles the `sasso` compiler crate **v0.6.0** (unchanged from 0.1.0).
+
 ### Added
 
 - musllinux (Alpine) wheels for x86_64 and aarch64, built with
