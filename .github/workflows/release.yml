@@ -57,7 +57,7 @@ jobs:
             plat: manylinux_2_17_aarch64
             qemu: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # aarch64 wheels are cross-built by running the aarch64 PyPA container under
       # QEMU binfmt emulation — the simplest correct option (no cross-linker
@@ -65,7 +65,7 @@ jobs:
       # auditwheel verifies the glibc/musl baseline against that container).
       - name: Set up QEMU (aarch64 emulation)
         if: ${{ matrix.qemu }}
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
@@ -105,7 +105,7 @@ jobs:
               auditwheel repair --plat "$PLAT" -w wheelhouse /tmp/tagged/*.whl
             '
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-linux-${{ matrix.libc }}-${{ matrix.arch }}
           path: wheelhouse/*.whl
@@ -135,9 +135,9 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx_deployment_target }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -160,7 +160,7 @@ jobs:
           python scripts/retag_wheel.py --platform-tag ${{ matrix.platform_tag }} \
             --in-dir repaired --out-dir wheelhouse
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-macos-${{ matrix.arch }}
           path: wheelhouse/*.whl
@@ -173,9 +173,9 @@ jobs:
     name: windows x86_64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -197,7 +197,7 @@ jobs:
           python scripts/retag_wheel.py --platform-tag win_amd64 \
             --in-dir repaired --out-dir wheelhouse
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-windows-x86_64
           path: wheelhouse/*.whl
@@ -211,8 +211,8 @@ jobs:
     name: sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Verify package version == tag
@@ -228,7 +228,7 @@ jobs:
           if tar tzf dist/*.tar.gz | grep -E 'libsasso\.(so|dylib)|sasso\.dll'; then
             echo "ERROR: sdist contains a prebuilt native library"; exit 1
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -246,7 +246,7 @@ jobs:
       id-token: write   # mint a short-lived PyPI token via OIDC (no secret)
     steps:
       - name: Download all wheels + sdist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           pattern: "{wheel-*,sdist}"
