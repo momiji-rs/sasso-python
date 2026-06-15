@@ -26,10 +26,11 @@ permissions: {}
 
 jobs:
   # -------------------------------------------------------------------------
-  # Linux (x86_64 + aarch64, manylinux + musllinux) — built INSIDE the official
-  # PyPA manylinux/musllinux containers so the glibc/musl baseline is correct and
-  # auditwheel can vendor/verify against it. aarch64 is cross-built by running the
-  # aarch64 container under QEMU binfmt emulation (simple, no cross-linker setup).
+  # Linux (x86_64 + aarch64, manylinux/glibc) — built INSIDE the official PyPA
+  # manylinux2014 (glibc 2.17) containers so the baseline is correct and auditwheel
+  # can vendor/verify against it. aarch64 is cross-built by running the aarch64
+  # container under QEMU binfmt emulation (simple, no cross-linker setup).
+  # (musllinux/Alpine is deferred — see the matrix note.)
   # -------------------------------------------------------------------------
   linux:
     name: linux ${{ matrix.arch }} · ${{ matrix.libc }}
@@ -38,29 +39,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The glibc-2.17 baseline image is published as `manylinux2014_<arch>`
+          # (the `manylinux_2_17_<arch>` name is NOT a real image tag); the
+          # auditwheel POLICY name is still `manylinux_2_17_<arch>`.
+          # musllinux (Alpine) is deferred to a follow-up: a cdylib on the musl
+          # target needs `-C target-feature=-crt-static` and is unvalidated.
           - arch: x86_64
             libc: manylinux
-            image: quay.io/pypa/manylinux_2_17_x86_64
+            image: quay.io/pypa/manylinux2014_x86_64
             linux_tag: linux_x86_64
             plat: manylinux_2_17_x86_64
             qemu: false
-          - arch: x86_64
-            libc: musllinux
-            image: quay.io/pypa/musllinux_1_2_x86_64
-            linux_tag: linux_x86_64
-            plat: musllinux_1_2_x86_64
-            qemu: false
           - arch: aarch64
             libc: manylinux
-            image: quay.io/pypa/manylinux_2_17_aarch64
+            image: quay.io/pypa/manylinux2014_aarch64
             linux_tag: linux_aarch64
             plat: manylinux_2_17_aarch64
-            qemu: true
-          - arch: aarch64
-            libc: musllinux
-            image: quay.io/pypa/musllinux_1_2_aarch64
-            linux_tag: linux_aarch64
-            plat: musllinux_1_2_aarch64
             qemu: true
     steps:
       - uses: actions/checkout@v4
