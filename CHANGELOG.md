@@ -8,6 +8,12 @@ release notes the exact core crate version it bundles.
 
 ## [Unreleased]
 
+### Added
+
+- musllinux (Alpine) wheels for x86_64 and aarch64, built with
+  `-C target-feature=-crt-static` (the musl target's default static C runtime
+  can't produce a cdylib). Adds Alpine to the prebuilt-wheel coverage.
+
 ## [0.1.0] - 2026-06-15
 
 Initial release. In-process SCSS/Sass → CSS via a `ctypes` binding over the
@@ -25,7 +31,8 @@ Initial release. In-process SCSS/Sass → CSS via a `ctypes` binding over the
 - `sasso.LoadResult(contents, syntax="scss", source_map_url=None)`.
 - `sasso.compiler_version()` (the bundled compiler version) and a PEP 561
   `py.typed` marker (the package is fully type-hinted).
-- Prebuilt platform wheels for Linux (manylinux + musllinux, x86_64 + aarch64),
+- Prebuilt platform wheels for Linux (manylinux/glibc, x86_64 + aarch64),
   macOS (arm64 + x86_64), and Windows (x86_64). A single native library per
   `(OS, arch)` serves every CPython 3.x — this is a ctypes binding, not a
-  CPython C-extension — plus a buildable-from-source sdist.
+  CPython C-extension — plus a buildable-from-source sdist. (musllinux/Alpine
+  wheels followed in the next release.)
