@@ -112,21 +112,24 @@ jobs:
           if-no-files-found: error
 
   # -------------------------------------------------------------------------
-  # macOS — arm64 (macos-14) and x86_64 (macos-13). Native build + delocate.
+  # macOS — both arches built on the arm64 runner (macos-14). The x86_64 dylib
+  # is CROSS-COMPILED (cargo --target x86_64-apple-darwin); delocate inspects/
+  # repairs it without running it. We avoid the macos-13 (Intel) runner pool,
+  # whose long/unreliable queue otherwise blocks the whole release.
   # -------------------------------------------------------------------------
   macos:
     name: macos ${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-14
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
-            arch: arm64
+          - arch: arm64
+            rust_target: aarch64-apple-darwin
             platform_tag: macosx_11_0_arm64
             macosx_deployment_target: "11.0"
-          - runner: macos-13
-            arch: x86_64
+          - arch: x86_64
+            rust_target: x86_64-apple-darwin
             platform_tag: macosx_10_12_x86_64
             macosx_deployment_target: "10.12"
     env:
@@ -139,13 +142,15 @@ jobs:
           python-version: "3.12"
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - name: Install build tooling
         run: python -m pip install --upgrade pip build wheel delocate
 
-      - name: Build native cdylib + wheel
+      - name: Build native cdylib (${{ matrix.rust_target }}) + wheel
         run: |
-          python scripts/build_native.py
+          python scripts/build_native.py --target ${{ matrix.rust_target }}
           python -m build --wheel --outdir dist
 
       - name: Repair (delocate) + retag
