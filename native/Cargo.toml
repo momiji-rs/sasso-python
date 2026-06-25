@@ -18,7 +18,7 @@
 name = "sasso-native"
 # Tracks the bundled core `sasso` compiler version (reported by `sasso_version`).
 # The Python PACKAGE version floats independently — see pyproject.toml / CHANGELOG.
-version = "0.6.0"
+version = "0.6.3"
 edition = "2021"
 # 1.77 for `std::mem::offset_of!` (per-field versioned-struct gating in
 # read_options), matching the upstream ffi crate.
@@ -40,7 +40,7 @@ crate-type = ["cdylib"]
 # `sasso_core` so this package's lib can be named `sasso` (a crate may not depend
 # on a crate of its own name without a rename). Bump this pin deliberately to
 # adopt a new core release (and re-vendor src/lib.rs + include/sasso.h to match).
-sasso_core = { package = "sasso", version = "=0.6.0" }
+sasso_core = { package = "sasso", version = "=0.6.3" }
 
 [profile.release]
 # Copied from the upstream ffi crate. `panic = "unwind"` is set EXPLICITLY (not

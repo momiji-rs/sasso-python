@@ -4,13 +4,13 @@ version = 3
 
 [[package]]
 name = "sasso"
-version = "0.6.0"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83097b3d397d2788442c22b10a20a173a771808342e595cef26241bac803eb07"
+checksum = "4bcc15ed0914f0ad1a1ed01b1aa236511eada9f911d5ab80cdd17dcf233d9a95"
 
 [[package]]
 name = "sasso-native"
-version = "0.6.0"
+version = "0.6.3"
 dependencies = [
  "sasso",
 ]
