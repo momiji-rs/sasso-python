@@ -16,13 +16,13 @@ import sasso
 def test_package_version_is_independent():
     # The PACKAGE version (this Python distribution) floats independently of the
     # bundled compiler; it is a plain semver string, not the compiler version.
-    assert sasso.__version__ == "0.1.0"
+    assert sasso.__version__ == "0.1.2"
 
 
 def test_compiler_version_is_bundled_core():
     # compiler_version() reports the native sasso crate the wheel was built
-    # against. This release bundles core 0.6.0.
-    assert sasso.compiler_version() == "0.6.0"
+    # against. This release bundles core 0.6.3.
+    assert sasso.compiler_version() == "0.6.3"
     assert sasso.compiler_version() != sasso.__version__
 
 
@@ -44,6 +44,14 @@ def test_compile_compressed():
 
 def test_compile_empty_source():
     assert sasso.compile("") == ""
+
+
+def test_compile_omits_trailing_newline():
+    # The C ABI is dart-sass's LIBRARY API, which (unlike the CLI) does NOT
+    # append a trailing newline — for both expanded and compressed output.
+    # Bundled core >= 0.6.3 fixed this; guard against a regression.
+    assert sasso.compile(".a { color: red }") == ".a {\n  color: red;\n}"
+    assert sasso.compile(".a { color: red }", style="compressed") == ".a{color:red}"
 
 
 # --- options ---------------------------------------------------------------
@@ -128,7 +136,7 @@ def test_custom_importer_relative_use():
         url="/entry",
         importer=DictImporter(files),
     )
-    assert css == ".out {\n  color: #336699;\n}\n"
+    assert css == ".out {\n  color: #336699;\n}"
 
 
 def test_importer_not_found_surfaces_as_error():

@@ -8,6 +8,20 @@ release notes the exact core crate version it bundles.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-25
+
+Bundles the `sasso` compiler crate **v0.6.3** (was v0.6.0), which brings
+byte-for-byte dart-sass parity for the trailing newline.
+
+### Fixed (via `sasso` core >= 0.6.3)
+
+- `compile(...)` no longer appends a trailing newline. The C ABI is dart-sass's
+  **library** API, which — unlike the `sass` CLI — does not terminate its output
+  with `\n`, for both expanded and compressed styles. Output is now byte-for-byte
+  identical to dart-sass's `compileString().css`. If you previously relied on the
+  trailing newline (e.g. writing the result straight to a `.css` file), append it
+  yourself: `Path("out.css").write_text(sasso.compile(src) + "\n")`.
+
 ## [0.1.1] - 2026-06-15
 
 Bundles the `sasso` compiler crate **v0.6.0** (unchanged from 0.1.0).
